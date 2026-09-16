@@ -13,7 +13,7 @@ def bpb(model,data,limit=None):
         if limit and n>=limit:break
     return loss/(n*math.log(2)),n
 def main():
-    p=argparse.ArgumentParser();p.add_argument("checkpoint");p.add_argument("validation");p.add_argument("--dim",type=int,default=512);p.add_argument("--layers",type=int,default=16);p.add_argument("--limit",type=int);a=p.parse_args()
-    m=Model(a.dim,a.layers,.75,5e-4);m.load(a.checkpoint);value,n=bpb(m,bytes_of(a.validation),a.limit)
+    p=argparse.ArgumentParser();p.add_argument("checkpoint");p.add_argument("validation");p.add_argument("--dim",type=int,default=512);p.add_argument("--layers",type=int,default=16);p.add_argument("--memory-dim",type=int);p.add_argument("--limit",type=int);a=p.parse_args()
+    m=Model(a.dim,a.layers,.75,5e-4,memory_dim=a.memory_dim);m.load(a.checkpoint);value,n=bpb(m,bytes_of(a.validation),a.limit)
     print({"validation_bpb":value,"bytes":n})
 if __name__=="__main__":main()

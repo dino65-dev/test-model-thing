@@ -1,4 +1,4 @@
-"""Stdlib-only P0-P4 math diagnostics."""
+"""Stdlib-only P0-P4 mathematical illustrations (not the MLX proof suite)."""
 import math, random
 from pathlib import Path
 OUT=Path("artifacts/math_diagnostics")
@@ -55,13 +55,13 @@ def main():
  if n:s.append(n)
  plot(OUT/"p4_entropy_patches.svg","P4 entropy boundary patch sizes",[("bytes",list(enumerate(s,1)))])
  err=max(x[3] for x in tr)
- (OUT/"REPORT.md").write_text(f"""# TMT-v2 Mathematical Diagnostics
-P0: private underscore buffers are used in main.py and should not be in MLX parameters.
+ (OUT/"REPORT.md").write_text(f"""# TMT-v4 Mathematical Illustrations
+P0: private underscore buffers are used in main.py and are not MLX parameters.
 P1: alpha=2^(-1/H), normalized injection, and scalar eligibility finite-difference check passed (max error {err:.3e}).
 P2: rho R(omega) has eigenvalue magnitude rho; plot confirms rho=.995 decay.
 P3: delta-rule associative-memory retrieval error is plotted.
 P4: entropy threshold produces shorter patches at uncertain bytes.
-The trace validation is scalar/local only; it is not a claim of full BPTT, UORO, or KF-RTRL equivalence.
+These are explanatory scalar illustrations. Run tmt_v3_validation.py and gradient_fidelity.py for MLX finite-difference and exact-BPTT measurements.
 """)
  print("wrote",OUT)
 if __name__=="__main__":main()

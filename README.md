@@ -1,55 +1,52 @@
-# Test-Model-Thing: TMT-v3
+# Test-Model-Thing: TMT-v4
 
-TMT-v3 is an experimental streaming byte-level recurrent model built with MLX.
-It combines multi-timescale complex state-space modes, structured local
-eligibility traces, multi-horizon predictive latent learning, and delta-rule
-associative fast memory. Runtime recurrent storage is constant with stream
-length; this is compressed memory, not unlimited information capacity.
+TMT-v4 is an experimental MLX streaming byte model. Its pairwise recurrent
+state combines multi-timescale decay, raw complex rotations, elementwise gated
+writes, structured online eligibility traces, and an associative delta memory.
+It remains a bounded-memory model: state is constant in stream length, not a
+claim of unlimited context.
 
-## Core recurrence
+## Mathematics and optimizer ownership
 
-For each two-dimensional state pair:
+For each state pair, `s_t = rho R(theta_t)s_(t-1) + sqrt(1-rho^2) gate(x_t)x_t`,
+where `rho = sigmoid(decay)`, the base phase is a raw angle, and the input phase
+controller is `theta_t = phase + pi*tanh(phase_scale*pair_mean(x_t)+phase_bias)`.
 
-    s_t = rho R(theta_t) s_(t-1) + sqrt(1-rho^2) gate(x_t) * x_t
-    theta_t = theta + pi*tanh(phase_scale * pair_mean(x_t) + phase_bias)
-    gate(x_t) = sigmoid(write_scale * x_t + write_bias)
+The online optimizer is bias-corrected AdamW with **zero decay** for decay,
+phase, gate/controller, LayerNorm, and bias parameters. A small decoupled decay
+is applied only to selected dense matrices. Memory is frozen from online
+optimization and has exactly one owner: a separate bounded temporal-BPTT
+optimizer trained on future byte cross entropy. This prevents two Adam moment
+histories from updating the same controller leaves.
 
-Half-lives and periods use a cross product, so persistent period-2 and
-period-3 modes coexist with short and long smoothing modes. The elementwise
-gate is deliberate: its local injection derivative is cheap and explicit.
+`memory_enabled=False`, `complex_enabled=False`, and `learn_decay=False` are
+architectural ablations: each bypasses/fixes its relevant dynamics rather than
+setting a trainable output to zero.
 
-TMT uses a structured local eligibility approximation, not full RTRL. Recurrent
-state, eligibility buffers, EMA target, and fast-memory matrix are private MLX
-buffers, explicitly serialized, and never passed to AdamW.
+## Checkpoints
 
-## Training and inference
+TMT-v4 saves model parameters, both optimizer states, and every runtime buffer.
+It requires exact `tmt-v4` metadata and exact parameter/buffer keys and shapes
+on load. Earlier checkpoints intentionally do not load partially.
 
-- train_step(current, target, future) uses byte cross entropy, weighted
-  multi-horizon cosine prediction, streaming variance, and writer loss.
-- frozen_step(token) updates only recurrent/fast memory.
-- stateless_step(token) restores every mutable buffer afterward.
-- Output is one 257-way byte/EOS categorical distribution.
+## Validation and experiments
 
-Legacy checkpoints are intentionally incompatible with TMT-v3. Retrain rather
-than partially loading v1/v2 weights.
+Run from this directory:
 
-## Validation
+```sh
+../.venv/bin/python tmt_v3_validation.py
+../.venv/bin/python gradient_fidelity.py --seeds 10 --max-t 128  # L=1/2; use --layers-list 1,2,4 --min-t 256 --max-t 256 for the T=256 extension
+../.venv/bin/python synthetic_ablations.py --seeds 10
+../.venv/bin/python language_monitor.py tmt-v4.safetensors HELDOUT.bin
+```
 
-From test-model-thing:
+The strict suite performs 50 randomized finite-difference checks for the local
+pair Jacobian and phase eligibility, exact delayed-byte-CE memory-BPTT gradient
+checks, optimizer ownership checks, checkpoint rejection checks, and a 512x16
+online step. Gradient fidelity reports trace versus instantaneous gradients for
+L=1/2 with memory on/off, including per-family energy shares. Synthetic results
+are multi-seed extrapolation measurements, not capability claims.
 
-    ../.venv/bin/python tmt_v3_validation.py
-    ../.venv/bin/python math_diagnostics.py
-
-The first script runs real MLX checks for buffer separation, gate and phase
-finite differences, exact tiny-model BPTT, associative-controller gradients,
-state cycles, and an online step. Reports live in artifacts/.
-
-benchmark.py trains a linear CoLA head on train and reports held-out dev MCC,
-resetting state per sentence and reading the post-memory representation.
-
-## Scope limits
-
-Entropy patches currently schedule/measures boundaries but do not yet skip
-recurrent computation. Chat is a byte-LM interface, not a role-trained
-assistant. Before long corpus training, use validation BPB, parity/modular
-tracking, delayed-copy, and associative-recall experiments.
+During `Runtime.train`, every 100 bytes logs byte loss, bytes/sec, rho
+half-life range, phase distribution, forget gate, and state/trace RMS. The
+language monitor adds held-out BPB for an explicitly supplied corpus.
